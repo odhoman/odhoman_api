@@ -61,11 +61,9 @@ public class ConfigConstants {
 
 	public static final String COMMON_EJB_GEAEJB = "ejb/common/GeaEjb"; /** ejb del servicio Gea */
 	
-	
-	
-
 		
 		/** Conexion estandar - simple */
+	
 		
 	    public static final String COMMON_DB_DRIVER   = "common.db.driver";  /** JDBC driver */
 	    
