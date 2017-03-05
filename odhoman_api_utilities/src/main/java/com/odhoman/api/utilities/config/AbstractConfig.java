@@ -54,7 +54,8 @@ public abstract class AbstractConfig extends Properties {
 	protected void loadConfig(String path) {
 		InputStream in;
 		try {
-			in = new FileInputStream(path);
+			
+			in = getClass().getClassLoader().getResourceAsStream(path);
 			load(in);
 			in.close();
 			
@@ -99,7 +100,11 @@ public abstract class AbstractConfig extends Properties {
 			throw new ApplicationErrorException("AbstractConfig: Error al intentar obtener el logger!!!. La property " + logPathProperty + " no se encuentra!!!");
 		
 		try {
-			PropertyConfigurator.configure(getProperty(logPathProperty).trim());
+			
+			Properties props = new Properties();
+			props.load(getClass().getClassLoader().getResourceAsStream(getProperty(logPathProperty).trim()));
+			PropertyConfigurator.configure(props);
+			
 			return Logger.getLogger(logger.trim());
 		} catch(Exception e) {
 			throw new ApplicationErrorException("AbstractConfig: Error al intentar obtener el logger. No se pudo configurar el log!!!. Causa: " + e.getLocalizedMessage(), e);

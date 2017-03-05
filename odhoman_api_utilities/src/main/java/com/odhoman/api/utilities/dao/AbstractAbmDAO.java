@@ -2,8 +2,10 @@ package com.odhoman.api.utilities.dao;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.apache.log4j.Logger;
@@ -418,6 +420,61 @@ public abstract class AbstractAbmDAO<T,F> implements Initializable {
 			closeResources(db, ps, null, "changeItems");
 		}
 	}
+	
+	/** Modifica una lista de items a partir de una lista de filters. Supone que todos los filters se realizan por el mismo campo o conjunto de campos. */
+	
+	public int changeDifferentItems(List<F> filters, List<T> items) throws DAOException {
+		
+		logger.debug(getClassName() + " - changeItems: Ejecutando...");
+		
+		if(filters == null || filters.isEmpty()) {
+			logger.debug(getClassName() + " - changeItems: Finalizando. No hay items que actualizar");
+			return 0;
+		}
+		
+		DatabaseConnection db = null;			
+		PreparedStatement ps = null;
+				
+		try {
+			db = getDatabaseConnection();
+			db.connect();
+			
+			logger.debug(getClassName() + " - changeItems: filters=" + filters);
+			for (int i = 0; i < filters.size(); i++) {
+			
+				//Solo con el primer item arma el prepared statement necesario. Luego simplemente hace el fill correspondiente al item.
+				//Tener en cuenta que se supone que todos los filters vendran por el mismo o mismos campos...
+				
+				if(ps == null) {
+					ps = buildUpdateStatement(db, items.get(i), filters.get(i), false);	//No se hace la validacion de cantidad de items a actualizar.
+				}
+				
+				fillUpdateParameters(filters.get(i), items.get(i), ps, db);	//Se completan los parametros del update
+				
+				ps.addBatch();
+			}
+				
+			int[] resultado = ps.executeBatch();
+			
+			logger.debug(getClassName() + " - changeItems: Batch ejecutado");
+			
+			int resultadoTotal = getProcessedResultCount(resultado);
+			
+			logger.info(getClassName() + " - changeItems: Se actualizaron " + resultadoTotal + " items");
+			
+			ps.clearBatch();
+			
+			return resultadoTotal;
+
+		} catch (DAOException e) {
+			throw e;
+		} catch (Exception e) {
+			logger.error(getClassName() + " - changeItems: Exception", e);
+			throw new DAOException(e);
+		} finally {
+			closeResources(db, ps, null, "changeItems");
+		}
+	}	
 
 	protected String getOrdenamiento(OrderInfo orderInfo) {
 		
@@ -870,6 +927,101 @@ public abstract class AbstractAbmDAO<T,F> implements Initializable {
 		PreparedStatement ps = db.prepare(sql);
 		
 		return ps;
+	}
+	
+	
+	protected String appendFields(List<String> fields){
+		int sequenceNumber = 0;
+		StringBuffer conditions = new StringBuffer();
+		
+		for(String field: fields){
+		
+			if(sequenceNumber==0){
+				conditions.append(" "+ field+" = ? ");
+				sequenceNumber++;
+				continue;
+			}
+			
+			if(sequenceNumber > 0) {
+				conditions.append(" AND ");
+			}else{
+				sequenceNumber++;	
+			}
+			
+			conditions.append(" "+ field+" = ? ");
+			
+		}
+		
+		return conditions.toString();
+	}
+	
+	protected int fillListParameter(int initialSeq, List<Object> lista, PreparedStatement ps)
+			throws SQLException {
+		for (Object o : lista)
+			initialSeq = fillInsertOrUpdateParameter(initialSeq, o, ps);
+		
+		return initialSeq;
+	}
+
+	protected int fillInsertOrUpdateParameter(int seq, Object o, PreparedStatement ps) throws SQLException {
+
+		if (null == o) {
+			ps.setNull(seq, java.sql.Types.NULL);
+		} else {
+			fillParameterByType(seq, o, ps);
+		}
+
+		seq++;
+
+		return seq;
+	}
+	
+	protected int fillSelectListParameter(int initialSeq, List<Object> lista, PreparedStatement ps)
+			throws SQLException {
+		for (Object o : lista)
+			initialSeq = fillSelectParameter(initialSeq, o, ps);
+		
+		return initialSeq;
+	}
+	
+	protected int fillSelectParameter(int seq, Object o, PreparedStatement ps) throws SQLException {
+
+		if (null == o) {
+			return seq;
+		} else {
+			fillParameterByType(seq, o, ps);
+		}
+
+		seq++;
+
+		return seq;
+	}
+
+	protected void fillParameterByType(int seq, Object o, PreparedStatement ps) throws SQLException {
+		if (o instanceof Long) {
+			ps.setLong(seq, (Long) o);
+		} else if (o instanceof String) {
+			String value = (String) o;
+			if(isNotEmpty(value)){
+				ps.setString(seq, (String) o);
+			}else{
+				ps.setNull(seq, java.sql.Types.NULL);
+			}
+		} else if (o instanceof Double) {
+			ps.setDouble(seq, (Double) o);
+		} else if (o instanceof Date) {
+			Date date = (Date) o;
+			ps.setDate(seq, new java.sql.Date(date.getTime()));
+		}
+	}
+	
+	protected <M extends Object> M getValueOrNull(M value, ResultSet rs) throws SQLException {
+
+		if (rs.wasNull()) {
+			return null;
+		}
+
+		return value;
 	}
 
 }

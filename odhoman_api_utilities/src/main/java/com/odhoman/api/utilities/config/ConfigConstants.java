@@ -20,6 +20,8 @@ public class ConfigConstants {
 	
 	public static final String APP_DB_CONNECTION_TYPE   = "app.db.connection_type";  /** Modo de conexion a DB */
 	
+	public static final String APP_NAME   = "app.name";  /** Modo de conexion a DB */
+	
 	
 	/** Configuracion de base de datos - Modos de conexion */
 	

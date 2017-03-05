@@ -26,14 +26,15 @@ public class AppConfig extends AbstractConfig {
 	 * 
 	 */
 	protected AppConfig() {
+		
 		String configPath = System.getProperty("config.path.app",
-				"EJECUTAR EL JVM CON -Dconfig.path.app" + "=path_absoluto_de_config");
+				"app.properties");
 		
 		System.out.println("AppConfig: Leyendo configuracion en: " + configPath);
 
 		loadConfig(configPath);
 		
-		setLogger(getLogger(ConfigConstants.LOG4J_CONFIG_PATH, "actual_app"));
+		setLogger(getLogger(ConfigConstants.LOG4J_CONFIG_PATH, getProperty(ConfigConstants.APP_NAME,"app_default_name")));
 	}
 
 	/**
