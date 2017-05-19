@@ -37,7 +37,6 @@ public abstract class AbstractAbmDAO<T,F> implements Initializable {
 		logger = this.config.getLogger();
 	}
 	
-	@Override
 	public void init(Object... params) {
 		setConfiguration((AbstractConfig) params[0]);
 	}
@@ -955,23 +954,31 @@ public abstract class AbstractAbmDAO<T,F> implements Initializable {
 		return conditions.toString();
 	}
 	
-	protected int fillListParameter(int initialSeq, List<Object> lista, PreparedStatement ps)
+	protected int fillInsertSelectListParameter(int initialSeq, List<Object> lista, PreparedStatement ps)
 			throws SQLException {
 		for (Object o : lista)
-			initialSeq = fillInsertOrUpdateParameter(initialSeq, o, ps);
+			initialSeq = fillInsertOrUpdateParameter(initialSeq, o, ps,false);
+		
+		return initialSeq;
+	}
+	
+	protected int fillUpdateListParameter(int initialSeq, List<Object> lista, PreparedStatement ps)
+			throws SQLException {
+		for (Object o : lista)
+			initialSeq = fillInsertOrUpdateParameter(initialSeq, o, ps, true);
 		
 		return initialSeq;
 	}
 
-	protected int fillInsertOrUpdateParameter(int seq, Object o, PreparedStatement ps) throws SQLException {
+	protected int fillInsertOrUpdateParameter(int seq, Object o, PreparedStatement ps, boolean required) throws SQLException {
 
-		if (null == o) {
+		if (null == o && !required) {
 			ps.setNull(seq, java.sql.Types.NULL);
-		} else {
+			seq++;
+		} else if(null != o){
 			fillParameterByType(seq, o, ps);
-		}
-
-		seq++;
+			seq++;
+		} 
 
 		return seq;
 	}
