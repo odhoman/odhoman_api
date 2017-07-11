@@ -933,22 +933,63 @@ public abstract class AbstractAbmDAO<T,F> implements Initializable {
 		int sequenceNumber = 0;
 		StringBuffer conditions = new StringBuffer();
 		
-		for(String field: fields){
-		
-			if(sequenceNumber==0){
+		if(fields!=null && !fields.isEmpty()){
+					
+			for(String field: fields){
+			
+				if(sequenceNumber==0){
+					conditions.append(" "+ field+" = ? ");
+					sequenceNumber++;
+					continue;
+				}
+				
+				if(sequenceNumber > 0) {
+					conditions.append(" AND ");
+				}else{
+					sequenceNumber++;	
+				}
+				
 				conditions.append(" "+ field+" = ? ");
-				sequenceNumber++;
-				continue;
+				
 			}
 			
-			if(sequenceNumber > 0) {
-				conditions.append(" AND ");
-			}else{
-				sequenceNumber++;	
+		}else{
+			
+			// Se agrega esto para que traiga todo porque no hay filtros
+			conditions.append(" 1 = 1 ");
+		}
+		
+		return conditions.toString();
+	}
+	
+	protected String appendFieldsOr(List<String> fields){
+		int sequenceNumber = 0;
+		StringBuffer conditions = new StringBuffer();
+		
+		if(fields!=null && !fields.isEmpty()){
+					
+			for(String field: fields){
+			
+				if(sequenceNumber==0){
+					conditions.append(" "+ field+" = ? ");
+					sequenceNumber++;
+					continue;
+				}
+				
+				if(sequenceNumber > 0) {
+					conditions.append(" OR ");
+				}else{
+					sequenceNumber++;	
+				}
+				
+				conditions.append(" "+ field+" = ? ");
+				
 			}
 			
-			conditions.append(" "+ field+" = ? ");
+		}else{
 			
+			// Se agrega esto para que traiga todo porque no hay filtros
+			conditions.append(" 1 = 1 ");
 		}
 		
 		return conditions.toString();
@@ -1029,6 +1070,116 @@ public abstract class AbstractAbmDAO<T,F> implements Initializable {
 		}
 
 		return value;
+	}
+	
+	/** Devuelve todos los items que cumplan con los n filters especificados */
+	
+	public List<T> getItems(List<F> filters) throws DAOException {
+		
+		PageInfo pageInfo = new PageInfo(1, Integer.MAX_VALUE);
+		
+		OrderInfo orderInfo = new OrderInfo("1", EnumOrderInfo.ORDER_TYPE_ASC.getDescripcion());
+		
+		return getItems(filters, pageInfo, orderInfo);
+	}
+	
+	/** Devuelve los items paginados que cumplan con los n filters, pageInfo y orderInfo especificados */
+	
+	public List<T> getItems(List<F> filters, PageInfo pageInfo, OrderInfo orderInfo) throws DAOException {
+		
+		logger.debug(getClassName() + " - getItems: Ejecutando...");
+		
+		DatabaseConnection db = null;
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+		
+		try {
+			db = getDatabaseConnection();
+			db.connect();
+			
+			logger.debug(getClassName() + " - getItems: hay + "+filters.size()+" filtros - pageInfo=" + pageInfo + " - orderInfo=" + orderInfo);
+			
+			//Se define si se hara paginado o no...
+			
+			boolean pagingActive = pageInfo != null && pageInfo.getItemsPerPage() != Integer.MAX_VALUE;
+			
+			StringBuffer query = new StringBuffer(pagingActive ? "SELECT * FROM (SELECT a.*, rownum rnum FROM (" : "");
+			
+			query.append("SELECT ");
+			
+			int i = 0;
+			for(String field : getSelectFields()) {	//Obtencion de los campos del select
+				i++;
+				if(i > 1) {
+					query.append(",");
+				}
+				query.append(field);
+			}
+			
+			query.append(" FROM ");
+			
+			int j = 0;
+			for(String field : getSelectTables()) {	//Obtencion de las tablas del select
+				j++;
+				if(j > 1) {
+					query.append(",");
+				}
+				query.append(field);
+			}
+			
+			query.append(" WHERE ");
+			
+			query.append(getSelectConditions(filters));	//Obtencion de los campos del select
+			
+			query.append(" ORDER BY " + getOrdenamiento(orderInfo));
+			
+			if(pagingActive) {			
+				query.append(") a ) WHERE rnum BETWEEN ");
+				query.append(((pageInfo.getPage() - 1) * pageInfo.getItemsPerPage()) + 1);
+				query.append(" AND ");
+				query.append( pageInfo.getPage() * pageInfo.getItemsPerPage() );
+			}
+			
+			String sql = query.toString();
+			
+			logger.info(getClassName() + " - getItems: QUERY: " + sql);
+			
+			ps = db.prepare(sql);
+			
+			fillSelectParameters(filters, ps, db);	//Se completan los parametros del select
+
+			rs = ps.executeQuery();
+			
+			logger.debug(getClassName() + " - getItems: Query ejecutada");
+			
+			List<T> items = new ArrayList<T>();
+			T item = null;			
+			while(rs.next()) {
+				
+				item = loadItem(rs);	//Obtiene las columnas y crea el objeto final			
+				items.add(item);				
+			}
+			
+			logger.info(getClassName() + " - getItems: Retornando " + items.size() + " items");
+			
+			return items;
+			
+		} catch (Exception e) {
+			logger.error(getClassName() + " - getItems: Exception", e);
+			throw new DAOException(e);
+		} finally {
+			closeResources(db, ps, rs, "getItems");
+		}		
+	}
+	
+	/** Devuelve las condiciones del select a realizar (n filtros) */
+	
+	protected String getSelectConditions(List<F> filters) {
+		throw new ApplicationErrorException("Debe implementar este metodo en el DAO "+getClassName());
+	}
+	
+	protected void fillSelectParameters(List<F> filters, PreparedStatement ps, DatabaseConnection db) throws Exception {
+		throw new ApplicationErrorException("Debe implementar este metodo en el DAO "+getClassName());
 	}
 
 }
